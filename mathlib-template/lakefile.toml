@@ -1,0 +1,11 @@
+name = "template"
+version = "0.1.0"
+defaultTargets = ["Template"]
+
+[[lean_lib]]
+name = "Template"
+roots = ["Template"]
+
+[[require]]
+name = "mathlib"
+path = "C:/Users/user/mathlib4"
