@@ -44,7 +44,6 @@ Dependency Type Theory is a type theory that allows the types be depend on value
 The properties of **DTT** allows that some precise mathematical definitions can be expressed by **Lean**.
 
 
-
 # Basic
 
 ## Note
@@ -397,3 +396,34 @@ Sometimes, if lean could not determine the type, or you want to assign the type,
 -- [2, 1]
 ```
 The first parameter of `List.cons` is actually a value of type `u`, and `#eval @List.cons Nat 2 [1]` imposes the type `Nat` on `2`.
+
+## Goal
+
+"Goal" is one of the core concept in Lean. It is basically the statement that you need to prove now. In InfoView, a goal is represented by `⊢`. The goal can be switched by tactics. Tactics are the commands that describe how to build such a proof. 
+
+For a proposition to be proven: `theorem my_thm : P → Q := by ...`, the initial goal is `P → Q`, and then we eliminate the goal by tactics, such as substituting a goal into different smaller sub-goals.
+
+When InfoView shows that `No goals`, we have proven the proposition.
+
+
+## Sigma Types
+
+Sigma Type is a special product(Cartesian) that put an object and something relied on the object togather. 
+
+The syntax sugar of Sigma Type is: `Σ a : α, β a` (`Σ` is typed by `\Sigma`) where `β` is a function whose type depends on `a`. This structure packs a value `a` and a type `β a` dependent on the value togater to `⟨a, b⟩` (typed by `\langle, \rangle`).
+
+## Quantifiers in Lean
+
+### Universal Quantifier
+
+$\forall x P(x)$ means that for all $x$ such that $P(x)$ holds. 
+
+We can define $\forall$ in Lean by "dependent function type", which is a type that the type returned depends on the value input. The basic syntax of dependent function type is: `(x : α) → β x`, where `β` is a function of type `α → Type` that receive a value `x` and then return a type `β x`.
+
+$\forall$ in lean relies on the syntax sugar of the dependent function type, where in `(x : α) → β x`, `β` itself also relies on `x`. 
+
+$\forall x P(x)$ in lean is represented by `∀ x : α, P x`. To prove `∀ x : α, P x`, we need to provide a function receiving `x` and returning that `P(x)` holds.
+
+### Existence Quantifier
+
+$\exists$ in lean is defined by "inductive type", which is a type constructing new elements by finite steps with a group of basic elements.
