@@ -301,7 +301,7 @@ def compose : (α β γ : Type) → (β → γ) → (α → β) → α → γ :=
 fun α β γ g f x => g (f x)
 -/
 ```
-The application of a `variable` last until the end of the documnet. `section` command is used to set up a bound of the application of `variable`. Syntax:
+The application of a `variable` last until the end of the documnet. `section` command is used to set up a domain for the application of `variable`. Syntax:
 ```lean
 section useful
   variable (α β γ : Type)
@@ -313,4 +313,87 @@ section useful
   def doThrice := h (h (h x))
 end useful
 ```
-`section` command allows nested structures.
+`section` command allows nested structures. 
+
+
+## Namespace
+
+`namespace` sets up a domain for the names. Syntax:
+```lean
+namespace name_of_space
+def v_1 : Nat := 5
+#check v_1 
+-- name_of_space.v_1 : Nat
+end name_of_space
+
+#check v_1
+-- error
+```
+In the above example, the variable `v_1` is only legal within the space `name_of_space`. Meanwhile, a namespace must have a name, unlike `section` which does not always needed to be assigned. 
+
+After the end of a namespasce, we can activate it again by `open`
+```lean 
+open name_of_space
+...
+```
+while it does not end until the current block ends. Thus, we can bound `open` command by `section`:
+```lean
+section 
+  open name_of_space
+  ...
+end
+```
+
+## Nature of Dependent Type Theory
+
+The essence of DTT is that 
+
+> Types can depend on parameters, and the types can be computed.
+
+For instance
+```lean
+def cons1 (α : Type) (a : α) (as : List α) : List α :=
+  List.cons a as
+```
+- `(α : Type)`: `α` is the first parameter of type `Type`, so you have to input a concrete type such as `Nat`, `Bool`.
+- `(a : α)`: `a` is the second parameter of type `α`, so that the type of `a` depends on the first parameter
+- `(as : List α)`: `as` is the third parameter of type `List α`, which is a list consist of elements of type `α`. 
+- `: List α`: `cons` is a function with inputs of type `List α`
+- `:= List.cons a as`: `List.cons` is a functions of Lean standard library, which insert `a` in the beginning of `as`.
+
+```lean
+#eval cons1 Nat 2 [1,2,3]
+-- [2, 1, 2, 3]
+```
+
+We say that types can depend on parameters because the types of an object vary with the parameters input. 
+
+```lean
+#check cons1 Nat
+-- cons1 Nat : Nat → List Nat → List Nat
+#check cons1 Bool True
+-- cons1 Bool (decide True) : List Bool → List Bool
+```
+where the type of `cons1 Nat` is `Nat → List Nat → List Nat`, which is of type `Type`
+```lean
+#check Nat → List Nat → List Nat
+-- Nat → List Nat → List Nat : Type
+```
+
+## @ command
+
+`@` command make the implicit parameters be explicit. Recall that there are three ways to assign the types
+- `(x : α)`: explicit parameter that the users must assign a type.
+- `{x : α}`: implicit parameter that lean would determine the type.
+- `[x : α]`: Lean would find by itself
+
+Sometimes, if lean could not determine the type, or you want to assign the type, `@` is used. For instance
+```lean 
+#check List.cons
+-- List.cons.{u} {α : Type u} (head : α) (tail : List α) : List α
+#eval List.cons 2 [1]
+-- [2, 1]
+#eval @List.cons Nat 2 [1]
+-- [2, 1]
+```
+The first parameter of `List.cons` is actually a value of type `u`, and `#eval @List.cons Nat 2 [1]` imposes the type `Nat` on `2`.
