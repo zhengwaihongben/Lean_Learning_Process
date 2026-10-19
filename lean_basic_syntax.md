@@ -198,7 +198,16 @@ Tactics are the commands used to process the propositions during proofs. Since a
 
 We will gradually introduce the detail of Tactics afterward.
 
-Tactic mode is an interactive mode that allows users to interact with the kernel of Lean 4. After entering tactic mode, turnstile symbol `⊢` appears in InfoView to specify the current goal, which is the object that need to be constructed. We can use different tactics to handle the goal. When `no goals` is returned, the proof/construction finishes.
+### Tactics, Goal and Hypothesis
+
+*Tactic mode* is an interactive mode that allows users to interact with the kernel of Lean 4. After entering tactic mode, turnstile symbol `⊢` appears in InfoView to specify the current goal. 
+
+In InfoView, 
+- **Hypothesis** are the contents above `⊢`. The hypothesis are all established results up to the current positions.
+- **Goal** are the contents in the right of `⊢`, which is the object that we need to construct
+
+We use different tactics to handle the goal by hypothesis. When `no goals` is returned, the proof/construction finishes.
+
 
 ## Function type
 
@@ -365,4 +374,63 @@ def BoolNot3 : Bool → Bool
 
 `match` is useful for defining certain objects.
 
-## Goal and hypothesis
+
+## Other Basic Commands
+
+### `let` command
+
+`let` is a local version of `def`, which is used to declare objects within commands such as `def`. The objects declared by `let` only available within the command. For instance:
+```lean
+def spherevolume (r : Float) : Float :=
+  let pi : Float := 3.141592
+  (4/3) * pi * r^3
+#eval spherevolume 3
+-- 113.097312
+#eval pi
+-- Unknown identifier `pi`
+```
+Here, the constant `pi` only callable within the function `spherevolume`.
+
+### `variable` command
+
+`variable` is used to declare global placeholders so that we do not need to declare them in `def` everytime. Syntax:
+```lean
+variable (symbol : type)
+```
+For example:
+```lean
+variable (x y : Float)
+#check x
+-- x : Float
+```
+
+### `namespace` command
+
+`namespace` is a sturctural command in Lean that used to declare a domain for the objects. The function, constants or variables defined in a namespace are only callable within the namespace. We can also name the namespaces. Syntax:
+```lean
+namespace name_space
+...
+end name_space
+```
+Note that a namespace is ended by `end`. We can call the objects defined in a namespace outside the space by `name_space.object`, for example
+```lean
+namespace idk
+def a : Nat := 3
+end idk
+
+#eval idk.a
+-- 3
+```
+
+### `open` command
+
+`open` is used to directly call the the object defined in a certain namespace, so that we do not need to type the name of the namespace.
+```lean
+namespace idk
+def a : Nat := 3
+end idk
+
+open idk 
+#eval a
+--3
+```
