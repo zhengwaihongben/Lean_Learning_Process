@@ -193,6 +193,7 @@ To disassemble a conjunction, we usually use `exact`. Suppose We have `h : P ∧
 example (p : P ∧ Q): P := by
   exact And.left p
 ```
+or we can use `have pl : P := p.left` to take `P` as an independent term, and so the right.
 
 We can also use `And.intro p q` to construct `p ∧ q` in a proof. For example:
 ```lean
@@ -244,6 +245,18 @@ case right
 P Q : Prop
 h : P ∨ Q
 ⊢ Q → Q ∨ P
+```
+
+We can use `cases .. with  | inl .. =>  | inr .. =>` to seperate a disjuction into two cases:
+```lean
+variable (a : P ∨ Q)
+example : R := by
+  cases a with
+  | inl hP =>
+    -- Branch 1: if a is constructed by Or.inl, that means P holds
+    sorry
+  | inr hQ =>
+    sorry
 ```
 
 ### Implication
@@ -371,10 +384,39 @@ To prove `¬P`, we need to construct a `False`. For example:
 theorem ThModusTollens (h1 : P → Q) (h2 : ¬Q) : ¬P := by
   -- ⊢ ¬P
   intro h3  -- ⊢ False , because ¬ is P → False
-  have h4 : Q :=by  -- introduce h4 : Q so that ⊢ Q
+  have h4 : Q := by  -- introduce h4 : Q so that ⊢ Q
     exact h1 h3  -- we have h1 : P → Q and h3 : P, so we can use h1 and h3 to get Q
   exact h2 h4  -- ⊢ False , we now have Q and by h2, we get False.
 ```
+
+### Classical
+
+`Classical` is a preset namespace of Lean 4, which involves some non-constructive axioms. There are three important non-constructive axioms:
+- `em` excluded middle: 
+- `byContradiction` proof by contradictio:
+- `choice` axiom of choice
+
+We can construct `P ∨ ¬P` by `em P`
+```lean
+#print em  -- ⊢ ∀ (p : Prop), p ∨ ¬p
+example (P : Prop) : P ∨ ¬P := by
+  exact em P
+-- constructing:
+have h : P ∨ ¬P := em P
+```
+or when we are not sure the truth of `A : Prop`, we can use `by_cases hA : A` to discuss the two cases, which relies on excluded middle.
+
+We can start a proof by contradiction by `by_contra ..` or `apply byContradiction` which turn the goal to `⊢ ¬ Goal → False`
+```lean
+example (P : Prop) (h : ¬P → False) : P := by
+  apply Classical.byContradiction  -- ⊢ ¬P → False
+  intro hnP
+  exact h hnP
+```
+For the axiom of choice, if it is known that `h : ∃ x, P x` holds, we can non-constructively select a certain `x` by `choice h`.
+
+
+---
 
 We conclude that:
 
@@ -388,3 +430,178 @@ We conclude that:
 | **False** | `False` | inductive | unable to be constructed | `False.elim h` / `cases h` |
 | **Negation** | `¬P` | functional | `intro hP`and then `False` | `h hP` and then `False` |
 
+And, `.elim` is a postfix called eliminator, which directly split an inductive type into all constructors.
+
+## Quantifiers
+
+Quantifiers allow us to make general statements about elements of a type.
+
+### Predicates
+
+A predicate is a map/function that represent a property or a relation. For $P(x)$, $P$ is the predicate acting on the variable $x$, which is a proposition with variable $x$. In Lean 4, a predicate is actually a type of the form: `A → Prop` where `A` is an arbitrary tyep. For example:
+```lean
+variable (A : Type)
+variable (P : A → Prop)
+```
+A predicate is a function that return a proposition. For example:
+
+```lean
+variable (P Q : A → Prop)
+def Operator {A : Type} (P Q : A → Prop) : A → Prop := by
+  intro a
+  -- a : A ⊢ Prop
+  exact (P a ∧ Q a) ∧ (P a ∨ Q a)
+  -- no goals
+```
+It defines a double `∧` that the predicates `P`, `Q`, and `R` are input, a proposition `P a ∧ Q a ∧ R a` is output, where `a` is in type `Type`.
+
+### Operations on Predicates, and `notation` command
+
+In Lean, we can assign meaning for a symbol/operator by `Notation` command. For `DoubleAnd` defined before, we need to tyep `DoubleAnd P Q R` every time, which is inconvenient. We can use `notation` command to define a new symbol for the function that we defined. 
+
+For example, we want to use the symbol `⊙`(`\oo`) to denote the operator `Operator`:
+```lean
+notation:65 lhs:65 " ⊙ " rhs:66 => Operator lhs rhs
+```
+so that we can use `(P ⊙ Q)` to call the operator `Operator`. `notation:65` means that the precedence of the operation is same to the relations such as `=`, `<`. `lhs:65` and `rhs:66` indicate the associativity. The operation is right-associative if `lhs < rhs`: `P ⊙ (Q ⊙ R) = P ⊙ Q ⊙ R`; it is left-associative if `lhs = rhs`: `(P ⊙ Q) ⊙ R = P ⊙ Q ⊙ R`. `Operator lhs rhs` is the format of the operator.
+
+For other types of operators:
+|Type|Syntax|Example|
+|---|---|--|
+|Infix|`notation:65 lhs:65 " + " rhs:66 => add lhs rhs`|`a+b`|
+|Prefix|`notation:100 "- " a:100 => neg a`|`- a`|
+|Postfix|`notation:100 a:100 " ! " => fact a`|`a!`|
+
+The number above repersent the precedence of the operator, which are decided by Lean Community. The larger the number, the greater the precedence.
+| Precedence Level | Typical Use Case | Common Symbols |
+| :--- | :--- | :--- |
+| **`1024`** | Function application (Highest) | `f x` |
+| **`max`** (`1024`) | Atomic expressions, parentheses | `(...)` |
+| **`arg`** (`1023`) | Function arguments | `do`, `by` |
+| **`80`~`100`** | Prefix operators, multiplicative | `-x`, `*`, `/`, `%` |
+| **`70`** | Additive | `+`, `-`, `++` |
+| **`65`** | Relational, logical AND | `=`, `<`, `≤`, `∧`, `∈` |
+| **`50`~`60`** | Logical OR, bitwise | `∨`, `\|\|` |
+| **`35`** | Logical implication | `→` |
+| **`30`** | Biconditional / Iff | `↔` |
+| **`10`** | Assignment, comma | `:=`, `,` |
+| **`min`** (`0`) | Lowest precedence | `;`, `where` |
+
+### Universal Quantifier
+
+The universal quantifier `∀`(`\forall`) is to express statements of the form `∀ (a : A), P a`, which means that for every `a` of type `A`, the proposition `P a` holds. This enables us to make general statements about all elements of a given type.
+
+`∀ (a : A), P a` is of type `Prop` and it is true if `P a` is true for every element `a` of type `A`.
+```lean
+#check ∀ (a : A), P a
+-- ∀ (a : A), P a : Prop
+```
+We can also write an universal quantifier by: `∀ a, P a` and `∀ {a : A}, P a`.
+
+To prove the statement `∀ (a : A), P a`, we usually use `intro` tactic, which introduces an arbitrary element `a` of type `A` and requires us to prove `P a` for that arbitrary `a`.
+
+Conversely, if we have a hypothesis `h : ∀ (a : A), P a`, we can use it as a function:
+```lean
+variable (a : A)
+variable (h : ∀ (a : A), P a)
+#check h a
+-- h a : P a
+```
+
+`specialize` tactic is used to apply a hypothesis that is a universally quantified predicate to a specific object.
+```lean
+theorem my_forall2 (h : ∀ (a : A), P a) (x : A) : P x := by
+  specialize h x  -- h change to P x
+  exact h
+```
+`specialize h x` changes `h` from a proposition to a special case of `x`, and the statement of "for all x" is eliminated. This allows us to instantiate a general hypothesis with particular values, making it easier to work with in our proof.
+
+We give an example of proving a universal quantifier proposition:
+```lean
+variable (A : Type)
+variable (P Q : A → Prop)
+
+theorem forall_and_distribute (h : ∀ (x : A), P x ∧ Q x) : (∀ (x : A), P x) ∧ (∀ (x : A), Q x) := by
+  -- ⊢ (∀ (x : A), P x) ∧ ∀ (x : A), Q x
+  apply And.intro -- split the goal by the constructor of ∧
+  
+  · -- The left one
+    -- ⊢ ∀ (x : A), P x
+    intro x
+    -- introduce x : A and then ⊢ P x, we need to construct P x
+    have hx := h x        -- let hx be P x ∧ Q x
+    exact hx.left         -- the desired term is the left term of hx
+    
+  · -- The right one 
+    -- ⊢ ∀ (x : A), Q x
+    intro x   -- ⊢ Q x
+    specialize h x  -- h become P x ∧ Q x
+    exact h.right  -- Q x is exactly the right part of h
+```
+
+### Existential Quantifier
+
+The existential quantifier `∃`(`\exists`) is used to express statements of the form `∃ (a : A), P a` which means that for some `a` of type `A`, the proposition `P a` holds.
+```lean
+#check ∃ a, P a
+-- ∃ a, P a : Prop
+#print Exists
+/-
+inductive Exists.{u} : {α : Sort u} → (α → Prop) → Prop
+number of parameters: 2
+constructors:
+Exists.intro : ∀ {α : Sort u} {p : α → Prop} (w : α), p w → Exists p
+-/
+```
+It is shown that `∃` is also an inductive type with only one constructor `Exists.intro`, and two parameters: `α : Sort u` and the predicate `p : α → Prop`. By the constructor, to construct a proof of `∃`, we need to construct `(w : α)` and `p w` which is an element `w` satisfying `p`. 
+
+For example:
+```lean
+theorem T4 (h1 : ∃ (a : A), P a) (h2 : ∀ (a : A), P a → Q) : Q := by
+  -- As Exists is an inductive type, and we exactly have a : A and p a, we can use `cases` to match the constructor
+  cases h1
+  /-
+  A : Type
+  P : A → Prop
+  Q : Prop
+  h2 : ∀ (a : A), P a → Q
+  w✝ : A
+  h✝ : P w✝
+  ⊢ Q
+  -/
+  rename_i a h3  -- rename: a : A and h3 : P a
+  specialize h2 a -- let h2 be `P a → Q`
+  exact h2 h3  -- apply h3 : P a on h2 : P a → Q and finish the proof
+```
+
+`Exists.elim` is an eliminator of `∃`:
+```lean
+#print Exists.elim
+ /-
+ theorem Exists.elim.{u} : ∀ {α : Sort u} {p : α → Prop} {b : Prop}, (∃ x, p x) → (∀ (a : α), p a → b) → b :=
+  fun {α} {p} {b} h₁ h₂ =>
+    match h₁ with
+    | Exists.intro a h => h₂ a h
+ -/
+```
+It receives a proof of existential quantifier `∃ x, p x` and a predicate `p a → b`, then return a proof of `b`. For example:
+```lean
+theorem T5 (h1 : ∃ (a : A), P a) (h2 : ∀ (a : A), P a → Q) : Q := by
+  apply Exists.elim h1 h2
+```
+or it can also be written as:
+```lean
+theorem T5 (h1 : ∃ (a : A), P a) (h2 : ∀ (a : A), P a → Q) : Q := by
+  apply Exists.elim h1 -- ⊢ ∀ (a : A), P a → Q
+  exact h2
+```
+
+When the goal is to prove an existential quantifier, we can use `case ... with` to split the quantifer into the object contained in the constructor of `Exists`, that are `(w : α)` and `p w`, and then we can use `intro` to introduce them.(`case` is used to match the constructors of inductive types):
+```lean
+-- a : A
+-- hl : ∃ a, P a
+cases hl with 
+| intro va st =>  -- va : A, st : P a
+```
+
+We can use `Exists.intro a h` to construct a `∃ x, P x` if we have `(A : Type)`, `(P : A → Prop)`, `(a : A)` and `(h : P a)`.
