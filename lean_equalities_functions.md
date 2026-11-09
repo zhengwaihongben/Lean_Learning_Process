@@ -110,6 +110,12 @@ example (h1 : a = b) (h2 : b = c) (h3: c = d) : (a = d) := by
     _ = d := by rw[h3]
 ```
 
+## Simp
+
+`simp` tactic is similar to `rw`. It is an automated rewriting engine by searching all appropriate hypothesis, and finish the proof if the result is exactly the goal after simplification. 
+
+We can also use `simp [def, statement]` to simplify `statement` based on the definition `def`.
+
 # Types with meaningful equality
 
 Usually, we use `=` to indicate that the two expression are equal. In Lean 4, we can use it to connect all types, but not all of them can be connected naturally. The interpretation and behavior of `=` depend on the structure of the specific type. 
@@ -171,4 +177,290 @@ example {Q : Prop} : (Q ∧ True) = Q := by
 Furthermore, we can inspect which axioms are applied during the proof of a theorem `name` by `#print axioms`:
 ```lean
 #print axioms name
+```
+
+
+
+# Functions
+
+In Lean 4, a **function** is a relation that associates element of one type(domain) with a unique element of another type(codomanin). 
+
+We first assume that
+```lean
+variable (A B C D : Type)
+```
+Recall that for given types `A` and `B`, the expression `A → B` is the type of all functions from `A` to `B`. In this context, `A` is called the domain, and `B` the codomain, where each element `f` of `A → B` is a function. In Math, you can consider the type `A → B` as a family of mappings from `A` to `B`.
+
+For a certain term `a` of `A`, we write `f a` to apply `a` in `f`, which is the image of `a` under `f` and has type `B`
+```lean
+variable (f g : A → B)
+variable (a : A)
+#check f a
+-- f a : B
+```
+
+### Equality
+
+Recall we have proposition etensionality `propext`, which states that for the propositions, once `a ↔ b`, we have `a = b`. Similarly, we have function extensinoality `funext`, which is an axiom that if two functions with the same domain and codomain produce the same oupt for every input, then they are equal:
+```lean
+#print funext
+/-
+theorem funext.{u, v} : ∀ {α : Sort u} {β : α → Sort v} {f g : (x : α) → β x}, (∀ (x : α), f x = g x) → f = g :=
+fun {α} {β} {f g} h =>
+  let eqv := fun f g => ∀ (x : α), f x = g x;
+  let extfunApp := fun f x => f.liftOn (fun f => f x) fun x_1 x_2 h => h x;
+  id (congrArg extfunApp (Quot.sound h))
+-/
+```
+The core is that `∀ (x : α), f x = g x) → f = g`.
+
+Conversely, if two functions are equalt, then they yield the same result for every input, which is called the congruence property of function. It is guaranteed by the axiom `congrFun`:
+```lean
+#print congrFun
+/-
+theorem congrFun.{u, v} : ∀ {α : Sort u} {β : α → Sort v} {f g : (x : α) → β x}, f = g → ∀ (a : α), f a = g a :=
+fun {α} {β} {f g} h a => h ▸ rfl
+-/
+```
+
+They can be used to construct a proof:
+```lean
+example (A B: Type)(f g : A → B): (f = g) ↔ ∀ (a : A), f a = g a := by
+  apply Iff.intro
+  -- f = g → ∀ (a : A), f a = g a
+  intro h
+  intro a
+  exact congrFun h a
+  -- ∀( (a : X), f a = g a) → f = g
+  intro h
+  exact funext h
+```
+In fact, we can consider `funext` as proving set related propositions by discussing element-wise. To analog, if we want to prove $A = B$, we can discuss by
+$$\forall x \in A, x \in B$$
+and 
+$$\forall x \in B, x \in A$$
+
+### Composition
+
+If we have `f : A → B` and `h : B → C`, then their composition `h ∘ f`(`\circ`) is a function of type `A → C`
+```lean
+variable (h : B → C)
+#check h ∘ f
+```
+An important property of composition is associativity that for `f : A → B`, `g : B → C`, and `h : C → D`, we have `h ∘ (g ∘ f) = (h ∘ g) ∘ f`:
+```lean
+example (A B C D : Type)(f : A → B)(g : B → C)(h : C → D): h ∘ (g ∘ f) = (h ∘ g) ∘ f := by
+  funext a
+  rfl
+```
+where `funext a` turns the goal from an equality of functions into that of the images of functions, and then we use `rfl` to end since the kernel of Lean 4 deassembles the parentheses and inspect them.
+
+### Identity functions
+
+For any type `A`, we have the identity function `id`, which is of type `A → A`. It simply returns the input unchanged.
+```lean
+#print id
+/-
+@[implicit_reducible] def id.{u} : {α : Sort u} → α → α :=
+fun {α} a => a
+-/
+```
+
+By the definition, `id` returns receives an input of any type and then returns the input. In fact, `id` serves as a neutral element for function composition so that for any function `f : A → B`, we have `id ∘ f = f ∘ id`
+```lean
+example (A B : Type)(f : A → B) : (f ∘ id = f) ∧ (id ∘ f = f) := by
+  apply And.intro
+  -- ⊢ f ∘ id = f
+  funext a -- ⊢ (f ∘ id) a = f a
+  rfl
+  -- ⊢ id ∘ f = f
+  funext a
+  rfl
+```
+
+We can explicitly specify the domain of `id` by using `@` before `id`. For example
+```lean
+#check @id Int
+-- id : Int → Int
+```
+
+## Injections
+
+### Injection
+
+For a map or a function $f : A → B$, it is injective if for all $a_1, a_2 \in A$, $f(a1) = f(a2)$ implies that $a1 = a2$. We can define it by
+```lean
+def injective {A B : Type} (f : A → B) : Prop := ∀{a1 a2 : A}, (f a1 = f a2) → (a1 = a2)
+```
+which mean `injective` is a `Prop` of input `f : A → B`, which states that `∀{a1 a2 : A}, (f a1 = f a2) → (a1 = a2)`.
+
+Note that once we define a definition, such as `injective`, we can use it as a building block. We can use `injective f` to declare a hypothesis or a goal that `f` is injective, instead of typing a chain of codes. For example:
+```lean
+example {A : Type} : injective (@id A) := by
+-- ...
+example (h1 : injective f) (h2 : injective g) : injective (g ∘ f) := by
+```
+Or, we can use `rw [injective]` while `injective` is in the goal, to decompose the goral into the definition of `injective`
+```lean
+example {A : Type} : injective (@id A) := by
+  rw [injective] 
+  -- change the goal from "injective id" tp "∀ a1 a2, id a1 = id a2 → a1 = a2"
+  intro a1 a2 h 
+  -- we can now introduce a1, a2 and h
+  -- ...
+``` 
+It is similar to the following concepts.
+
+### Monomorphism 單態射
+
+In category theory, $f : A → B$ is a monomorphism if it is a morphism with left-cancellative, that mean for all $g_1, g_2: C → A$, $f \circ g_1 = f \circ g_2$ implies $g_1 = g_2$. In lean, we can define it in Lean 4 by:
+```Lean
+def monomorphism {A B : Type} (f : A → B) : Prop := ∀{C : Type}, ∀{g h : C → A}, f ∘ g = f ∘ h → g = h
+```
+
+### Left Inverse
+
+We say that a function $f : A \to B$ has a left inverse if there exists a function $g : A \to B$ such that $g \circ f = id$. We can define it in Lean 4 by
+```lean
+def hasleftinv {A B : Type} (f : A → B) : Prop := ∃(g : B → A), g ∘ f = id
+```
+
+### An example: The identity
+
+The identity is injective, a monomorphism and has a left inverse.
+```lean
+-- id is injective
+theorem TIdInj : injective (@id A) := by
+  -- we can turn call out the definition
+  rw [injective]
+  intro a1 a2 h
+  /-
+  A : Type
+  a1 a2 : A
+  h : id a1 = id a2
+  ⊢ a1 = a2
+  -/
+  calc  -- build a chain of calculation
+  a1 = id a1 := by exact rfl
+  _ = id a2 := by exact h
+  _ = a2 := by exact rfl
+```
+Note that we need to specify the type of input of `id` because the definition `injective` requires to specify that `f : A → B`.
+
+```lean
+-- id is a monomorphism
+theorem TIdMon : monomorphism (@id A) := by
+  rw [monomorphism]
+  intro C g h h2
+  /-
+  A C : Type
+  g h : C → A
+  h2 : id ∘ g = id ∘ h
+  ⊢ g = h
+  -/
+  calc
+    g = id g := by exact rfl
+    _ = id ∘ h := by exact h2
+    _ = h := by exact rfl
+```
+
+```lean
+-- id has a left inverse
+theorem TIdHasLeftInv : hasleftinv (@id A) := by
+  rw [hasleftinv]
+  apply Exists.intro id   -- which means sub g = id
+  exact rfl
+```
+
+## Surjections
+
+### Surjection
+
+A function $f: A \to B$ is surjective if for any $y \in B, \exists x \in A$ such that $f(x) = y$. We can define it in Lean 4 by
+```lean
+def hasrightinv {A B : Type}(f : A → B): Prop := ∀ (y : B), ∃ (x : A), f x = y
+```
+
+### Epimorphism 滿態射
+
+In category theory, an epimorphism is a map $f : A \to B$ such that for $g_1, g_2 : B \to C$, $g_1 \circ f = g_2 \circ f$ implies that $g_1 = g_2$. We can define that by
+```lean
+def epimorphism {A B : Type} (f : A → B) : Prop := ∀{C : Type}, ∀{g h : B → C}, g ∘ f = h ∘ f → g = h
+```
+
+### Right Inverse
+
+A function $f: A \to B$ has a right inverse if there esixts a function $g: B \to A$ such that $f \circ g = id$
+```lean
+def hasrightinv {A B : Type}(f : A → B) : Prop := ∃(g : B → A), f ∘ g = id
+```
+
+### An example: The identity
+
+The identity is surjective, an epimorphism and has a right inverse.
+```lean
+-- id is surjective
+theorem TIdSurj : surjective (@id A) := by
+  rw [surjective]
+  intro a
+  apply Exists.intro a
+  rfl
+```
+
+```lean
+-- id is an epimorphism
+theorem TIdEpi : epimorphism (@id A) := by
+  rw [epimorphism]
+  intro B g h h1
+  calc
+    g = g ∘ id := by exact rfl
+    _ = h ∘ id := by exact h1
+    _ = h := by exact rfl
+```
+
+```lean
+-- id has a right inverse
+theorem TIdHasrightinv : hasrightinv (@id A) := by
+  rw [hasrightinv]
+  apply Exists.intro id
+  rfl
+```
+
+## Bijection
+
+### Bijective
+
+A function $f: A \to B$ is bijective if it is injective and surjective. We can define it in Lean 4 by
+```lean
+def bijective {A B : Type} (f : A → B) : Prop := injective f ∧ surjective f
+```
+
+### Isomorphism
+
+In category theory, a function $f : A \to B$ is an isomorphism if there exists a function $g : B \to A$ such that $f \circ g = id$ and $g \circ f = id$. In Lean 4:
+```Lean
+def isomorphism {A B : Type} (f : A → B) : Prop := ∃ (g : B → A), g ∘ f = id ∧ f ∘ g = id
+```
+
+### An example: The identity 
+
+The identity is bijective and an isomorphism
+
+```lean
+-- id is bijective 
+theorem TIdBij : bijective (@id A) := by
+  rw [bijective]
+  apply And.intro
+  exact TIdInj
+  exact TIdSurj
+```
+
+```lean
+-- id is an isomorphism
+theorem TIdIso : isomorphism (@id A) := by
+  rw [isomorphism]
+  apply Exists.intro id
+  apply And.intro
+  rfl
+  rfl
 ```

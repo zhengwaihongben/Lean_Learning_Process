@@ -604,4 +604,4 @@ cases hl with
 | intro va st =>  -- va : A, st : P a
 ```
 
-We can use `Exists.intro a h` to construct a `∃ x, P x` if we have `(A : Type)`, `(P : A → Prop)`, `(a : A)` and `(h : P a)`.
+We can use `Exists.intro a h` to construct a `∃ x, P x` if we have `(A : Type)`, `(P : A → Prop)`, `(a : A)` and `(h : P a)`. Or, if we only type `Exists.intro a`, it is equivalent to substituting `a` in `∃ a` to the goal turns to `P a`.

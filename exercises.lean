@@ -118,30 +118,3 @@ theorem E11_3_4 (a : A) : ( ∃ (a : A), R → P a ) → (R → ∃ (a : A), P a
     exact b
   exact Exists.intro a h3
 
-#print axioms E11_3_4
-
-#print Ne
-
-#check Eq.trans
-
-#print DecidableEq
-#print Decidable.isFalse
-#check Decidable.isFalse
-
-#check DecidableEq Bool
-
-#print propext
-
-example {Q : Prop} : (Q ∧ True) = Q := by
-    apply propext
-    apply Iff.intro
-    -- ⊢ Q ∧ True → Q
-    intro h2
-    exact h2.left
-    -- ⊢ Q → Q ∧ True
-    intro h3
-    apply And.intro  -- seperate the disjunction
-    -- ⊢ Q
-    exact h3
-    -- ⊢ True
-    trivial
